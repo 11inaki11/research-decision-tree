@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- EDIT: page title, 2-4 words -->
+<title>Field Recorder Tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Research decision tree. Layout: one lane per design decision (left to right), SVG edges between options, detail panel beside the tree.
+   Do not edit this block unless changing the look; all project content lives in the HTML header and the DATA section of the script. */
+:root{
+  --bg:#f2f5f6; --surface:#ffffff; --ink:#14232b; --muted:#5b6c74; --line:#c9d4d8;
+  --accent:#0f7f86; --accent-soft:#d6eeee; --warn:#b8641a; --warn-soft:#f6e6d6;
+  --edge:#b4c3c8; --edge-on:#0f7f86; --chip:#e5ecee;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --lanes:6; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e171b; --surface:#152228; --ink:#e4ecee; --muted:#93a5ac; --line:#2a3b42;
+  --accent:#4fc4c9; --accent-soft:#163a3d; --warn:#e3a061; --warn-soft:#3a2a1b;
+  --edge:#33474f; --edge-on:#4fc4c9; --chip:#1d2d33; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e171b; --surface:#152228; --ink:#e4ecee; --muted:#93a5ac; --line:#2a3b42;
+  --accent:#4fc4c9; --accent-soft:#163a3d; --warn:#e3a061; --warn-soft:#3a2a1b;
+  --edge:#33474f; --edge-on:#4fc4c9; --chip:#1d2d33; color-scheme:dark}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px;overflow-x:hidden}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:28px;min-width:0}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:.005em}
+h1{font-size:clamp(1.9rem,3.4vw,2.6rem);font-weight:700;line-height:1.1}
+h2{font-size:1.35rem;font-weight:600}
+h3{font-size:1.15rem;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{max-width:72ch;color:var(--muted)}
+header{display:flex;flex-direction:column;gap:10px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:500}
+.loop{display:flex;flex-wrap:wrap;align-items:stretch;border:1px solid var(--line);background:var(--surface);border-radius:6px;overflow:hidden}
+.loop div{flex:1 1 150px;padding:12px 14px;border-right:1px solid var(--line);min-width:0;display:flex;flex-direction:column;gap:3px}
+.loop div:last-child{border-right:0}
+.loop .k{font-family:var(--mono);font-size:.72rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.loop .v{font-weight:600;font-size:.95rem}
+.loop .d{font-size:.83rem;color:var(--muted)}
+.loop .hot{background:var(--warn-soft)}
+.routes{display:flex;flex-direction:column;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:.86rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:999px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.chip:focus-visible,.node:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.7}
+.route-note{font-size:.9rem;color:var(--muted);max-width:90ch;min-height:2.6em}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:1000px){.main{grid-template-columns:minmax(0,1fr)}}
+.treebox{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface);min-width:0}
+.tree{position:relative;display:grid;grid-template-columns:repeat(var(--lanes),170px);gap:0 30px;padding:16px 18px 20px;min-width:max-content}
+.tree svg{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.lane{display:flex;flex-direction:column;gap:12px;position:relative;z-index:1}
+.lane-h{font-family:var(--mono);font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:2px}
+.lane-h span{color:var(--ink);font-weight:500}
+.node{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:5px;padding:9px 10px;border:1px solid var(--line);border-radius:5px;background:var(--surface);transition:opacity .2s,border-color .2s,background .2s}
+.node .t{font-family:var(--display);font-weight:600;font-size:.98rem;line-height:1.2}
+.node .s{font-size:.78rem;color:var(--muted);line-height:1.35}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-family:var(--mono);font-size:.64rem;letter-spacing:.04em;padding:1px 6px;border-radius:3px;background:var(--chip);color:var(--muted)}
+.tag.core{background:var(--accent-soft);color:var(--accent)}
+.tag.extra{background:transparent;border:1px dashed var(--line)}
+.tag.base{background:var(--warn-soft);color:var(--warn)}
+.tree.routed .node{opacity:.38}
+.tree.routed .node.on{opacity:1;border-color:var(--accent);background:var(--accent-soft)}
+.node.sel{box-shadow:0 0 0 2px var(--warn)}
+.node:hover{border-color:var(--accent)}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.2}
+.edge.on{stroke:var(--edge-on);stroke-width:2.4}
+.detail{border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:12px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);min-width:0}
+@media (max-width:1000px){.detail{position:static}}
+.detail dl{margin:0;display:flex;flex-direction:column;gap:10px}
+.detail dt{font-family:var(--mono);font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.detail dd{margin:2px 0 0;font-size:.9rem;overflow-wrap:anywhere}
+.detail .src{font-family:var(--mono);font-size:.78rem;color:var(--accent)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px}
+.panel{border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+ol.forks{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:10px}
+ol.forks li{font-size:.92rem}
+ol.forks b{font-weight:600}
+.weeks{display:flex;flex-direction:column}
+.wk{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.wk:first-child{border-top:0}
+.wk .d{font-family:var(--mono);font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.wk .w{font-size:.9rem}
+.wk.dl .d{color:var(--warn);font-weight:500}
+.foot{font-size:.82rem;color:var(--muted);max-width:90ch}
+@media (max-width:520px){.wk{grid-template-columns:minmax(0,1fr);gap:2px}}
+@media (prefers-reduced-motion:reduce){.node{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- EDIT: header text. Keep the ids (daysLeft) if you keep the deadline line. -->
+  <header>
+    <span class="eyebrow">Fictional example · workshop paper</span>
+    <h1>Bird-call classifier: decision tree</h1>
+    <p class="lede">Each column is one design decision, from raw recordings to the reported result. Pick a route to see which options it chains, or click any option to read what it is, what it needs, what could go wrong and where the idea came from.</p>
+    <div class="meta"><span>Deadline: <b id="deadlineTxt"></b> <span id="daysLeft"></span></span><span>System: <b>low-cost field recorders</b></span><span>Compute: <b>one laptop GPU</b></span></div>
+  </header>
+
+  <!-- EDIT: the pipeline strip. 4-7 steps; mark the step the paper contributes with class="hot". Delete the section if the project has no loop/pipeline. -->
+  <section class="loop" aria-label="Where the proposed system fits">
+    <div><span class="k">1 · Record</span><span class="v">10 s clips</span><span class="d">Recorders on a timer at dawn</span></div>
+    <div><span class="k">2 · Filter</span><span class="v">Energy gate</span><span class="d">Drop silent clips on device</span></div>
+    <div class="hot"><span class="k">3 · Classify</span><span class="v">Species model</span><span class="d">The contribution of the paper</span></div>
+    <div><span class="k">4 · Report</span><span class="v">Daily counts</span><span class="d">Per site, per species</span></div>
+  </section>
+
+  <section class="routes" aria-label="Routes">
+    <h2>Routes</h2>
+    <div class="chips" id="chips"></div>
+    <p class="route-note" id="routeNote"></p>
+  </section>
+
+  <div class="main">
+    <div class="treebox"><div class="tree" id="tree"><svg id="edges" aria-hidden="true"></svg></div></div>
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+
+  <div class="two">
+    <section class="panel">
+      <h2 id="decTitle">Decisions taken</h2>
+      <ol class="forks" id="decisions"></ol>
+    </section>
+    <section class="panel">
+      <h2>Calendar to the deadline</h2>
+      <div class="weeks" id="weeks"></div>
+      <p class="foot" id="calNote"></p>
+    </section>
+  </div>
+  <!-- EDIT: list every source the tree draws on. -->
+  <p class="foot">Sources: your project notes (fictional), the lab roadmap draft (fictional), your annotations on two related papers in your reading list (unnamed placeholders).</p>
+</div>
+
+<script>
+/* ===================== DATA: edit only this section ===================== */
+// Project settings. deadline is ISO yyyy-mm-dd; days left are computed in the page.
+const PROJECT={deadline:"2027-01-15",deadlineLabel:"15 Jan 2027",storeKey:"rdt-birdcalls-route",defaultRoute:"min",defaultNode:"mcnn",
+  allLabel:"Whole tree",allNote:"Every option and every possible connection, with no route highlighted.",recLabel:"recommended",
+  fields:["What it is","What it needs","Risk","Source"],calNote:"Options tagged Journal or Extra are outside this calendar."};
+// Scope tags. Keys are also CSS classes: core (accent), base (warm), extra (dashed), later (plain).
+const TAGTXT={core:"Workshop",later:"Journal",extra:"Extra",base:"Baseline"};
+// One entry per decision, in pipeline order: [id, label].
+const STAGES=[["data","Data"],["label","Labels"],["model","Model"],["eval","Evaluation"]];
+// Nodes: st = index into STAGES; t = short title; s = subtitle; what/need/risk/src = detail fields (HTML allowed).
+const N={
+ dOwn:{st:0,t:"Own recordings",s:"3 sites, one spring",tags:["core"],
+  what:"Clips from the recorders already deployed by the project.",need:"Copy the SD cards and index clips by site and date.",
+  risk:"Unknown how many clips contain calls at all: count a sample before relying on it.",src:"Your project notes"},
+ dPub:{st:0,t:"Public call library",s:"To be identified",tags:["later"],
+  what:"A public library of labelled bird calls for pre-training.",need:"Find one with a licence that allows research use.",
+  risk:"Not yet identified: the domain gap to cheap recorders is unknown.",src:"Lab roadmap draft"},
+ lHand:{st:1,t:"Hand labels",s:"Expert listens to a sample",tags:["core"],
+  what:"A volunteer expert labels a stratified sample of clips.",need:"Expert time; a labelling sheet.",
+  risk:"Expert availability not confirmed: ask before planning on it.",src:"Your project notes"},
+ lWeak:{st:1,t:"Weak labels",s:"From the public library",tags:["later"],
+  what:"Clip-level species tags inherited from library metadata.",need:"The public library above.",risk:"Noisy tags.",src:"Related paper A (your annotation)"},
+ mThr:{st:2,t:"Band-energy rule",s:"No learning",tags:["base"],
+  what:"Flag a species when energy in its typical frequency band exceeds a threshold.",need:"Nothing beyond the clips.",
+  risk:"None: it is the floor every model must beat.",src:"Standard baseline"},
+ mcnn:{st:2,t:"Small CNN",s:"On spectrograms",tags:["core"],
+  what:"A small convolutional network trained from scratch on the hand-labelled clips.",need:"The hand labels and the laptop GPU.",
+  risk:"Few labels per species may cause overfitting.",src:"Your project notes"},
+ mPre:{st:2,t:"Pre-trained + fine-tune",s:"Transfer from library",tags:["later"],
+  what:"Pre-train on the public library, fine-tune on own clips.",need:"Weak labels and more compute.",risk:"Does not fit the workshop deadline.",src:"Related paper B (your annotation)"},
+ eOff:{st:3,t:"Held-out site",s:"Train 2 sites, test 1",tags:["core"],
+  what:"Per-species F1 on a site never seen in training.",need:"Labels from all three sites.",risk:"One test site gives a wide uncertainty band.",src:"Lab roadmap draft"},
+ eDev:{st:3,t:"On-device timing",s:"Runs on the recorder?",tags:["extra"],
+  what:"Measure inference time and energy on the recorder hardware.",need:"A recorder on the bench.",risk:"Firmware access unknown.",src:"Your idea (meeting note)"}
+};
+// Edges: [from, to] only where the first option genuinely feeds or is compatible with the second.
+const E=[["dOwn","lHand"],["dPub","lWeak"],["lHand","mThr"],["lHand","mcnn"],["lWeak","mPre"],["lHand","mPre"],
+ ["mThr","eOff"],["mcnn","eOff"],["mPre","eOff"],["mcnn","eDev"]];
+// Routes: coherent paths. Exactly one rec:true (the minimum viable route for the deadline).
+const ROUTES=[
+ {id:"min",name:"Minimum workshop paper",rec:true,nodes:["dOwn","lHand","mThr","mcnn","eOff"],
+  note:"Own clips, hand labels, CNN against the band-energy baseline on a held-out site. Fits the deadline."},
+ {id:"journal",name:"Transfer (journal)",nodes:["dOwn","dPub","lHand","lWeak","mThr","mcnn","mPre","eOff"],
+  note:"Adds pre-training on a public library. Needs a library to be identified first."},
+ {id:"device",name:"On-device extra",nodes:["dOwn","lHand","mcnn","eDev"],
+  note:"Shows the CNN can run on the recorder itself. Only if firmware access is confirmed."}
+];
+// Decisions log: date of the last update and one item per decision taken (newest last). Pending forks start with "Pending:".
+const DECISIONS={date:"(fictional) 2 Dec",items:[
+ {b:"Hand labels first.",d:"Weak labels only if the public library is found and licensed."},
+ {b:"Pending: number of species.",d:"Five common species, or all species with at least 30 labelled clips? Only you can decide."}
+]};
+// Calendar back-planned from the deadline. dl:true marks the deadline week.
+const WEEKS=[
+ {d:"Week 1",w:"Copy SD cards, index clips, count a sample for call density."},
+ {d:"Week 2–3",w:"Hand labelling; band-energy baseline."},
+ {d:"Week 4",w:"Train the CNN; held-out-site evaluation."},
+ {d:"Week 5",dl:true,w:"Final runs, figures, writing. Submit."}
+];
+/* =================== END DATA: engine below, do not edit =================== */
+
+const tree=document.getElementById("tree"),svg=document.getElementById("edges"),detail=document.getElementById("detail");
+document.documentElement.style.setProperty("--lanes",STAGES.length);
+const lanes=STAGES.map(([k,l],i)=>{const d=document.createElement("div");d.className="lane";d.innerHTML=`<div class="lane-h">${i} · <span>${l}</span></div>`;tree.appendChild(d);return d});
+const tagHtml=tags=>tags.map(t=>`<span class="tag ${t}">${TAGTXT[t]||t}</span>`).join("");
+const el={};
+for(const [id,n] of Object.entries(N)){
+  if(!lanes[n.st]){console.warn("Node with bad stage:",id);continue}
+  const b=document.createElement("button");b.className="node";b.id="n-"+id;b.type="button";b.setAttribute("aria-pressed","false");
+  b.innerHTML=`<span class="t">${n.t}</span><span class="s">${n.s}</span><span class="tags">${tagHtml(n.tags)}</span>`;
+  b.addEventListener("click",()=>select(id));lanes[n.st].appendChild(b);el[id]=b;
+}
+let route=null;
+function draw(){
+  const r=tree.getBoundingClientRect();svg.setAttribute("width",tree.scrollWidth);svg.setAttribute("height",tree.scrollHeight);
+  const on=route?new Set(route.nodes):null;let html="";
+  for(const [a,b] of E){
+    if(!el[a]||!el[b]){console.warn("Edge with unknown node:",a,b);continue}
+    const A=el[a].getBoundingClientRect(),B=el[b].getBoundingClientRect();
+    const x1=A.right-r.left,y1=A.top+A.height/2-r.top,x2=B.left-r.left,y2=B.top+B.height/2-r.top,mx=(x1+x2)/2;
+    const lit=on&&on.has(a)&&on.has(b);
+    html+=`<path class="edge${lit?" on":""}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+  }
+  svg.innerHTML=html;
+}
+function select(id){
+  const n=N[id];if(!n)return;
+  for(const k in el){el[k].classList.toggle("sel",k===id);el[k].setAttribute("aria-pressed",String(k===id))}
+  const F=PROJECT.fields;
+  detail.innerHTML=`<span class="eyebrow">${STAGES[n.st][1]}</span><h3>${n.t}</h3><div class="tags">${tagHtml(n.tags)}</div>
+  <dl><div><dt>${F[0]}</dt><dd>${n.what}</dd></div><div><dt>${F[1]}</dt><dd>${n.need}</dd></div><div><dt>${F[2]}</dt><dd>${n.risk}</dd></div><div><dt>${F[3]}</dt><dd class="src">${n.src}</dd></div></dl>`;
+}
+const chips=document.getElementById("chips"),note=document.getElementById("routeNote");
+function setRoute(rt){
+  route=rt;tree.classList.toggle("routed",!!rt);
+  for(const k in el)el[k].classList.toggle("on",!!rt&&rt.nodes.includes(k));
+  for(const c of chips.children)c.setAttribute("aria-pressed",String(c.dataset.id===(rt?rt.id:"none")));
+  note.textContent=rt?rt.note:PROJECT.allNote;
+  try{localStorage.setItem(PROJECT.storeKey,rt?rt.id:"none")}catch(e){}
+  draw();
+}
+const all=document.createElement("button");all.className="chip";all.type="button";all.dataset.id="none";all.textContent=PROJECT.allLabel;all.onclick=()=>setRoute(null);chips.appendChild(all);
+for(const rt of ROUTES){const c=document.createElement("button");c.className="chip";c.type="button";c.dataset.id=rt.id;c.innerHTML=`<span class="dot"></span>${rt.name}${rt.rec?" · "+PROJECT.recLabel:""}`;c.onclick=()=>setRoute(rt);chips.appendChild(c)}
+// Header deadline, decisions log, calendar.
+document.getElementById("deadlineTxt").textContent=PROJECT.deadlineLabel;
+(()=>{const t=new Date(PROJECT.deadline+"T23:59:59"),now=new Date();const d=Math.ceil((t-now)/864e5);
+  const s=document.getElementById("daysLeft");if(s&&!isNaN(d))s.textContent=d>=0?`(${d} day${d===1?"":"s"} left)`:"(deadline passed)"})();
+document.getElementById("decTitle").textContent=`Decisions taken (${DECISIONS.date})`;
+document.getElementById("decisions").innerHTML=DECISIONS.items.map(i=>`<li><b>${i.b}</b> ${i.d}</li>`).join("");
+document.getElementById("weeks").innerHTML=WEEKS.map(w=>`<div class="wk${w.dl?" dl":""}"><span class="d">${w.d}</span><span class="w">${w.w}</span></div>`).join("");
+document.getElementById("calNote").textContent=PROJECT.calNote;
+let saved=PROJECT.defaultRoute;try{saved=localStorage.getItem(PROJECT.storeKey)||PROJECT.defaultRoute}catch(e){}
+select(N[PROJECT.defaultNode]?PROJECT.defaultNode:Object.keys(N)[0]);
+setRoute(ROUTES.find(r=>r.id===saved)||null);
+window.addEventListener("resize",draw);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+if(window.ResizeObserver)new ResizeObserver(draw).observe(tree);
+</script>
+</body>
+</html>
