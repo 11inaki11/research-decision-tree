@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Keep <title> equal to PROJECT.tabTitle and lang equal to PROJECT.lang (the validator checks both; the engine also sets them at load). -->
+<title>Greenhouse Drift Tree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Research decision tree. Layout: one lane per design decision (left to right), SVG edges between options, detail panel beside the tree.
+   Do not edit this block unless changing the look; all content and UI strings live in the DATA section of the script. */
+:root{
+  --bg:#f2f5f6; --surface:#ffffff; --ink:#14232b; --muted:#5b6c74; --line:#c9d4d8;
+  --accent:#0f7f86; --accent-soft:#d6eeee; --warn:#b8641a; --warn-soft:#f6e6d6; --done:#3f7a37; --done-soft:#e0eedb;
+  --edge:#b4c3c8; --edge-on:#0f7f86; --chip:#e5ecee;
+  --display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --lanes:6; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e171b; --surface:#152228; --ink:#e4ecee; --muted:#93a5ac; --line:#2a3b42;
+  --accent:#4fc4c9; --accent-soft:#163a3d; --warn:#e3a061; --warn-soft:#3a2a1b; --done:#93cf88; --done-soft:#1e3320;
+  --edge:#33474f; --edge-on:#4fc4c9; --chip:#1d2d33; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e171b; --surface:#152228; --ink:#e4ecee; --muted:#93a5ac; --line:#2a3b42;
+  --accent:#4fc4c9; --accent-soft:#163a3d; --warn:#e3a061; --warn-soft:#3a2a1b; --done:#93cf88; --done-soft:#1e3320;
+  --edge:#33474f; --edge-on:#4fc4c9; --chip:#1d2d33; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px;overflow-x:hidden}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:28px;min-width:0}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:.005em}
+h1{font-size:clamp(1.9rem,3.4vw,2.6rem);font-weight:700;line-height:1.1}
+h2{font-size:1.35rem;font-weight:600}
+h3{font-size:1.15rem;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{max-width:72ch;color:var(--muted)}
+header{display:flex;flex-direction:column;gap:10px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:500}
+.loop{display:flex;flex-wrap:wrap;align-items:stretch;border:1px solid var(--line);background:var(--surface);border-radius:6px;overflow:hidden}
+.loop div{flex:1 1 150px;padding:12px 14px;border-right:1px solid var(--line);min-width:0;display:flex;flex-direction:column;gap:3px}
+.loop div:last-child{border-right:0}
+.loop .k{font-family:var(--mono);font-size:.72rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.loop .v{font-weight:600;font-size:.95rem}
+.loop .d{font-size:.83rem;color:var(--muted)}
+.loop .hot{background:var(--warn-soft)}
+.routes{display:flex;flex-direction:column;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:.86rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:999px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.chip:focus-visible,.node:focus-visible{outline:2px solid var(--warn);outline-offset:2px}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.7}
+.route-note{font-size:.9rem;color:var(--muted);max-width:90ch;min-height:2.6em}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:1000px){.main{grid-template-columns:minmax(0,1fr)}}
+.treebox{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface);min-width:0}
+.tree{position:relative;display:grid;grid-template-columns:repeat(var(--lanes),170px);gap:0 30px;padding:16px 18px 20px;min-width:max-content}
+.tree svg{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.lane{display:flex;flex-direction:column;gap:12px;position:relative;z-index:1}
+.lane-h{font-family:var(--mono);font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:2px}
+.lane-h span{color:var(--ink);font-weight:500}
+.node{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:5px;padding:9px 10px;border:1px solid var(--line);border-radius:5px;background:var(--surface);transition:opacity .2s,border-color .2s,background .2s}
+.node .t{font-family:var(--display);font-weight:600;font-size:.98rem;line-height:1.2}
+.node .s{font-size:.78rem;color:var(--muted);line-height:1.35}
+.tags{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.tag{font-family:var(--mono);font-size:.64rem;letter-spacing:.04em;padding:1px 6px;border-radius:3px;border:1px solid transparent;background:var(--chip);color:var(--muted);white-space:nowrap}
+.tag.t-accent{background:var(--accent-soft);color:var(--accent)}
+.tag.t-warn{background:var(--warn-soft);color:var(--warn)}
+.tag.t-done{background:var(--done-soft);color:var(--done)}
+.tag.t-dashed{background:transparent;border:1px dashed var(--muted)}
+.tag.t-muted{background:var(--chip);color:var(--muted)}
+.tree.routed .node{opacity:.38}
+.tree.routed .node.on{opacity:1;border-color:var(--accent);background:var(--accent-soft)}
+.node.sel{box-shadow:0 0 0 2px var(--warn)}
+.node:hover{border-color:var(--accent)}
+.edge{fill:none;stroke:var(--edge);stroke-width:1.2}
+.edge.on{stroke:var(--edge-on);stroke-width:2.4}
+.detail{border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:12px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);min-width:0}
+@media (max-width:1000px){.detail{position:static}}
+.detail dl{margin:0;display:flex;flex-direction:column;gap:10px}
+.detail dt{font-family:var(--mono);font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.detail dd{margin:2px 0 0;font-size:.9rem;overflow-wrap:anywhere}
+.detail .src{font-family:var(--mono);font-size:.78rem;color:var(--accent)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:20px}
+.panel{border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+ol.log{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px}
+ol.log li{font-size:.92rem;display:flex;flex-direction:column;gap:3px;padding-left:12px;border-left:3px solid var(--line)}
+ol.log li.k-decision{border-left-color:var(--accent)}
+ol.log li.k-pending{border-left-color:var(--warn)}
+ol.log li.k-fact{border-left-color:var(--muted)}
+ol.log li.k-assumption{border-left-style:dashed;border-left-color:var(--muted)}
+ol.log .lh{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+ol.log .date{font-family:var(--mono);font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums}
+ol.log b{font-weight:600}
+.weeks{display:flex;flex-direction:column}
+.wk{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.wk:first-child{border-top:0}
+.wk .d{font-family:var(--mono);font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.wk .w{font-size:.9rem}
+.wk .w .tag{margin-right:6px;vertical-align:1px}
+.wk.ms .d{color:var(--accent);font-weight:500}
+.wk.dl .d{color:var(--warn);font-weight:500}
+.foot{font-size:.82rem;color:var(--muted);max-width:90ch}
+@media (max-width:520px){.wk{grid-template-columns:minmax(0,1fr);gap:2px}}
+@media (prefers-reduced-motion:reduce){.node{transition:none}}
+</style>
+</head>
+<body>
+<!-- Skeleton only: every visible string is rendered from the DATA section. Do not type project text here. -->
+<div class="wrap">
+  <header>
+    <span class="eyebrow" id="eyebrow"></span>
+    <h1 id="title"></h1>
+    <p class="lede" id="lede"></p>
+    <div class="meta" id="meta"></div>
+  </header>
+  <section class="loop" id="pipeline"></section>
+  <section class="routes" aria-labelledby="routesH">
+    <h2 id="routesH"></h2>
+    <div class="chips" id="chips"></div>
+    <p class="route-note" id="routeNote"></p>
+  </section>
+  <div class="main">
+    <div class="treebox"><div class="tree" id="tree"><svg id="edges" aria-hidden="true"></svg></div></div>
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+  <div class="two">
+    <section class="panel" aria-labelledby="decH">
+      <h2 id="decH"></h2>
+      <ol class="log" id="decisions"></ol>
+    </section>
+    <section class="panel" aria-labelledby="calH">
+      <h2 id="calH"></h2>
+      <div class="weeks" id="weeks"></div>
+      <p class="foot" id="calNote"></p>
+    </section>
+  </div>
+  <p class="foot" id="sources"></p>
+</div>
+
+<script>
+/* ===================== DATA: edit only this section ===================== */
+// Fictional example project. Strings are inserted as HTML (<b>, <sub> work; write &lt; and &amp; for literal < and &).
+const PROJECT={
+  lang:"en",
+  tabTitle:"Greenhouse Drift Tree",
+  eyebrow:"Fictional example · conference paper · greenhouse irrigation",
+  title:"Detecting probe drift in a greenhouse irrigation controller",
+  lede:"Each column is one design decision, from the data to the evaluation. Pick a route to see which options it chains, or click any option to read what it is, what it needs, what could go wrong and where the idea came from.",
+  meta:[{k:"System",v:"drip controller, 24 soil-moisture probes (fictional)"},{k:"Compute",v:"one laptop GPU"}],
+  deadline:"2027-02-26",
+  deadlineEstimated:false,
+  deadlineLabel:"26 Feb 2027",
+  storeKey:"rdt-greenhouse-route",
+  defaultRoute:"min", defaultNode:"mRes",
+  calNote:"Only Conference and Baseline options of the recommended route are planned here; Journal and Extra options are outside this calendar. Everything here is fictional.",
+  ui:{
+    routes:"Routes", wholeTree:"Whole tree", wholeTreeNote:"Every option and every possible connection, with no route highlighted.",
+    recommended:"recommended", pipeline:"Where the drift monitor fits",
+    decisions:"Decisions log (updated {date})", calendar:"Calendar to the deadline",
+    deadline:"Deadline", daysLeft:"{n} days left", dayLeft:"1 day left", deadlinePassed:"deadline passed", estimated:"estimated",
+    fields:{what:"What it is", need:"What it needs", risk:"Risk", src:"Source"},
+    kinds:{decision:"Decision", pending:"Pending", assumption:"Assumption", fact:"Fact"},
+    milestone:"Milestone", gate:"Go / no-go", deadlineRow:"Deadline", sources:"Sources"
+  }
+};
+// Pipeline strip: where the proposed system fits; hot marks the contribution. Use [] to hide it.
+const PIPELINE=[
+ {k:"Sense",v:"Probe readings",d:"Soil moisture every 10 min"},
+ {k:"Control",v:"Valve schedule",d:"Water when moisture drops below set point"},
+ {k:"Monitor",v:"Drift detector",d:"The contribution: is the probe still telling the truth?",hot:true},
+ {k:"Respond",v:"Flag or fall back",d:"Notify, or use an estimate"},
+ {k:"Grower",v:"Recalibrate",d:"Technician checks the probe"}
+];
+// Scope tags. tone picks the colour: accent | warn | muted | dashed | done.
+const TAGS={
+  core:{label:"Conference",tone:"accent"}, base:{label:"Baseline",tone:"warn"},
+  extra:{label:"Extra",tone:"dashed"}, later:{label:"Journal",tone:"muted"}
+};
+// One entry per design decision, in pipeline order: [id, label].
+const STAGES=[["data","Data"],["label","Drift labels"],["signal","Signal"],["detect","Detector"],["respond","Response"],["eval","Evaluation"]];
+// Nodes: st = index into STAGES; t = short title; s = subtitle; what/need/risk/src = the four detail fields.
+const N={
+ dLogs:{st:0,t:"Controller logs",s:"Site A, one season",tags:["core"],
+  what:"Ten-minute readings from the soil-moisture probes, valve commands and the weather station, exported from the controller.",
+  need:"An export script and a check of how many months are complete. The notes say \"about a season\"; the exact span is not yet counted.",
+  risk:"Gaps when the controller rebooted are likely. Count them before planning on a full season.",src:"Your project notes"},
+ dBench:{st:0,t:"Bench drift rig",s:"Probes in pots, controlled soil",tags:["core"],
+  what:"A few probes in pots of known soil, weighed daily, so true moisture is known and drift can be seen against it.",
+  need:"Spare probes, a scale, two weeks of bench time.",risk:"Bench soil is not greenhouse soil: drift may differ in the field.",src:"Lab meeting suggestion (fictional co-author)"},
+ dPub:{st:0,t:"Public sensor data",s:"Other farms, to be found",tags:["later"],
+  what:"An open soil-moisture dataset from other sites, to test whether the detector generalises.",
+  need:"Find a dataset with raw probe readings and maintenance records, and a licence that allows research use.",
+  risk:"None identified yet. Treat its existence as an assumption, not a fact.",src:"Lab roadmap draft"},
+ lMaint:{st:1,t:"Maintenance log",s:"Recalibration dates",tags:["core"],
+  what:"Each time a technician recalibrated or replaced a probe, the days before it count as drifted.",
+  need:"The paper maintenance book, transcribed. Ask who kept it.",
+  risk:"Onset of drift is unknown: only the repair date is recorded. Labels are late and coarse.",src:"Your project notes"},
+ lInj:{st:1,t:"Injected drift",s:"Synthetic, known onset",tags:["core","base"],
+  what:"Add slow offset and gain drift to clean stretches of the logs, with known start time and rate.",
+  need:"A drift model (linear and saturating) and clean stretches to inject into.",
+  risk:"Detectors can learn the injection shape rather than real drift. Report results on real labels too.",src:"Related paper P1 (your annotation)"},
+ lRef:{st:1,t:"Reference probe",s:"Weighed pots on the bench",tags:["core"],
+  what:"On the bench rig, drift is the gap between probe reading and the weighed true moisture.",
+  need:"The bench rig.",risk:"Few probes, so few drift events.",src:"Lab meeting suggestion (fictional co-author)"},
+ sRaw:{st:2,t:"Raw readings",s:"Windowed probe series",tags:["base"],
+  what:"The probe series itself, in sliding windows.",need:"Nothing extra.",
+  risk:"Irrigation pulses dominate the signal and hide slow drift.",src:"Standard baseline"},
+ sRes:{st:2,t:"Water-balance residual",s:"Measured minus predicted",tags:["core"],
+  what:"Predict moisture from valve commands and evapotranspiration with a simple bucket model; drift shows as a growing residual.",
+  need:"Valve commands and weather data in the logs; one bucket-model fit per bed.",
+  risk:"Model error and drift both grow the residual. Needs a check on clean periods first.",src:"Your idea (notes, week 2)"},
+ sCross:{st:2,t:"Cross-probe consistency",s:"Neighbours in the same bed",tags:["extra"],
+  what:"Compare each probe with others in the same bed; a probe that diverges alone is suspect.",
+  need:"At least two probes per bed. Not confirmed for every bed.",risk:"Beds watered differently break the assumption.",src:"Related paper P2 (your annotation)"},
+ mCusum:{st:3,t:"CUSUM on residual",s:"Classic change detection",tags:["base"],
+  what:"Cumulative-sum test on the signal, with a threshold tuned on clean periods.",need:"Clean periods for tuning.",
+  risk:"None: the floor the other detectors must beat.",src:"Standard baseline"},
+ mRes:{st:3,t:"Gaussian-process residual",s:"Uncertainty-aware",tags:["core"],
+  what:"A Gaussian process over the residual; an alarm when the residual leaves the predicted band for several hours.",
+  need:"The residual signal and a few hours of compute per site.",risk:"Kernel choice matters; a poor kernel gives either no alarms or many.",src:"Your project notes"},
+ mAe:{st:3,t:"Small autoencoder",s:"Reconstruction error",tags:["core"],
+  what:"A small autoencoder trained on clean windows; drifted windows reconstruct badly.",need:"Enough clean windows; laptop GPU.",
+  risk:"Learns irrigation patterns well, slow drift poorly. That would itself be a finding.",src:"Related paper P1 (your annotation)"},
+ mFound:{st:3,t:"Pre-trained time-series model",s:"Zero-shot forecast error",tags:["later"],
+  what:"Use a large pre-trained forecaster and treat its forecast error as the drift score.",
+  need:"Choose a model and check its licence; more compute than the others.",risk:"Does not fit the conference deadline.",src:"Lab roadmap draft"},
+ rFlag:{st:4,t:"Flag to grower",s:"Message, no control change",tags:["core","base"],
+  what:"The detector only notifies the grower that a probe may be drifting.",need:"Nothing extra.",
+  risk:"Alarm fatigue if false alarms are frequent: report false alarms per week.",src:"Standard baseline"},
+ rFall:{st:4,t:"Fallback estimate",s:"Use model instead of probe",tags:["extra"],
+  what:"While a probe is flagged, the controller uses the water-balance prediction or a neighbour probe instead.",
+  need:"Write access to the controller schedule, or a simulation of it.",risk:"A wrong fallback under-waters a bed. Bench or simulation only.",src:"Your idea (meeting note)"},
+ rRecal:{st:4,t:"Online recalibration",s:"Correct the offset live",tags:["later"],
+  what:"Estimate offset and gain from the residual and correct the probe reading on the fly.",need:"A stable residual model and reference readings.",
+  risk:"Can hide a dead probe behind a plausible correction.",src:"Related paper P2 (your annotation)"},
+ eReplay:{st:5,t:"Log replay",s:"Delay and false alarms",tags:["core"],
+  what:"Replay the season's logs and report detection delay, missed drifts and false alarms per probe-week.",need:"Labels from the maintenance log and injected drift.",
+  risk:"Late maintenance labels inflate the measured delay. Say so in the paper.",src:"Lab roadmap draft"},
+ eBench:{st:5,t:"Bench accuracy",s:"Against weighed pots",tags:["core"],
+  what:"Detection delay and error against true moisture on the bench rig.",need:"The bench rig running for its two weeks.",
+  risk:"Small sample; report it as a sanity check, not the main result.",src:"Lab meeting suggestion (fictional co-author)"},
+ eSeason:{st:5,t:"Live season trial",s:"Water use and yield",tags:["later"],
+  what:"Run the detector live for a season and compare water use with an unmonitored bed.",need:"A full season and the grower's agreement.",
+  risk:"Months long; outside any near deadline.",src:"Lab roadmap draft"}
+};
+// Edges: [from, to], left to right, only where the first option genuinely feeds or is compatible with the second.
+const E=[["dLogs","lMaint"],["dLogs","lInj"],["dBench","lRef"],["dPub","lMaint"],["dPub","lInj"],
+ ["lMaint","sRaw"],["lMaint","sRes"],["lMaint","sCross"],["lInj","sRaw"],["lInj","sRes"],["lInj","sCross"],["lRef","sRes"],["lRef","sRaw"],
+ ["sRaw","mCusum"],["sRaw","mAe"],["sRaw","mFound"],["sRes","mCusum"],["sRes","mRes"],["sCross","mCusum"],["sCross","mRes"],
+ ["mCusum","rFlag"],["mRes","rFlag"],["mAe","rFlag"],["mFound","rFlag"],["mRes","rFall"],["mRes","rRecal"],["mCusum","rFall"],
+ ["rFlag","eReplay"],["rFlag","eBench"],["rFall","eBench"],["rRecal","eBench"],["rRecal","eSeason"],["rFlag","eSeason"]];
+// Routes: coherent sets of nodes. Exactly one rec:true = the minimum acceptable route for the target venue and deadline.
+const ROUTES=[
+ {id:"min",name:"Minimum conference paper",rec:true,nodes:["dLogs","lMaint","lInj","sRes","mCusum","mRes","rFlag","eReplay"],
+  note:"Existing logs, maintenance and injected labels, a GP on the water-balance residual against CUSUM, flag only, evaluated by log replay. The smallest version a conference reviewer would accept: a learned detector against a classic baseline on real labels. Fits the deadline with margin."},
+ {id:"compare",name:"Detector comparison",nodes:["dLogs","dBench","lMaint","lInj","lRef","sRaw","sRes","mCusum","mRes","mAe","rFlag","eReplay","eBench"],
+  note:"The main experimental table: three detectors on raw and residual signals, on the logs and on the bench rig. Only if the bench rig is running by the go/no-go point in the week of 18 Jan."},
+ {id:"cross",name:"Cross-probe extra",nodes:["dLogs","lInj","sCross","mCusum","mRes","rFlag","rFall","eReplay","eBench"],
+  note:"Adds neighbour-probe consistency and a fallback estimate. Depends on beds having two probes, which is not confirmed."},
+ {id:"journal",name:"Journal version",nodes:["dLogs","dPub","lMaint","lInj","sRaw","sRes","mRes","mFound","rFlag","rRecal","eReplay","eSeason"],
+  note:"Generalisation to other farms, a pre-trained forecaster, online recalibration and a live season. Months of work."}
+];
+// Decisions log, oldest first. kind: decision | pending | assumption | fact. When a pending item is decided,
+// change its kind to "decision" and set its date in place; append new items at the end.
+const DECISIONS={updated:"4 Dec 2026, fictional",items:[
+ {date:"4 Dec",kind:"fact",title:"Logs cover about a season.",detail:"Your project notes. The exact span and the gaps are not counted yet; that is the first calendar task."},
+ {date:"4 Dec",kind:"decision",title:"Residual first, raw second.",detail:"The water-balance residual is the main signal; raw readings stay only as the baseline signal."},
+ {date:"4 Dec",kind:"decision",title:"Flag only for the conference.",detail:"No control changes on the real greenhouse before the deadline (your answer). Fallback is tested on the bench or in simulation."},
+ {date:"4 Dec",kind:"decision",title:"Injected drift is validated against real labels.",detail:"Every result on injected drift is paired with the same metric on maintenance-log labels."},
+ {date:"4 Dec",kind:"pending",title:"One site or two?",detail:"A second greenhouse would strengthen the paper but adds about a month of data cleaning (your estimate). Default: one site. Only you can decide."}
+]};
+// Calendar back-planned from the deadline. dl:true = final deadline row (exactly one); milestone:true = intermediate
+// deadline; gate:true = go/no-go point (say the condition in w).
+const WEEKS=[
+ {d:"7–20 Dec",w:"Export logs, count gaps, transcribe the maintenance book, fit the bucket model on clean periods."},
+ {d:"4–17 Jan",w:"Drift injection; CUSUM baseline; GP on residual. Start the bench rig if probes arrive."},
+ {d:"18 Jan",gate:true,w:"Is the bench rig running? If yes, the detector comparison route is on; if not, bench work moves to the journal version."},
+ {d:"18 Jan–7 Feb",w:"Log-replay evaluation; autoencoder if time allows; bench numbers if the rig ran."},
+ {d:"8–19 Feb",w:"Figures, ablations, writing."},
+ {d:"19 Feb",milestone:true,w:"Abstract and title registration (fictional venue rule)."},
+ {d:"20–26 Feb",dl:true,w:"Final read, submit on the 26th."}
+];
+// Sources footnote: every source the tree draws on.
+const SOURCES="(all fictional) your project notes, the lab roadmap draft, a lab-meeting suggestion from a co-author, and your annotations on related papers P1 and P2 in your reading list. P1 and P2 are placeholders, not real citations.";
+/* =================== END DATA: engine below, do not edit =================== */
+
+const $=id=>document.getElementById(id),U=PROJECT.ui;
+const fill=(s,o)=>String(s).replace(/\{(\w+)\}/g,(m,k)=>k in o?o[k]:m);
+const tagHtml=(key,label,tone)=>`<span class="tag t-${tone||"muted"}" data-tag="${key}">${label}</span>`;
+const tagsHtml=tags=>(tags||[]).map(t=>TAGS[t]?tagHtml(t,TAGS[t].label,TAGS[t].tone):tagHtml(t,t,"muted")).join("");
+// Language, tab title, header.
+document.documentElement.lang=PROJECT.lang;document.title=PROJECT.tabTitle;
+$("eyebrow").innerHTML=PROJECT.eyebrow;$("title").innerHTML=PROJECT.title;$("lede").innerHTML=PROJECT.lede;
+const daysLeft=(()=>{const t=new Date(PROJECT.deadline+"T23:59:59");return Math.ceil((t-new Date())/864e5)})();
+let dlTxt=`${U.deadline}: <b>${PROJECT.deadlineEstimated?"~":""}${PROJECT.deadlineLabel}</b>`;
+if(!isNaN(daysLeft))dlTxt+=` (${daysLeft>=0?fill(daysLeft===1?U.dayLeft:U.daysLeft,{n:daysLeft}):U.deadlinePassed}${PROJECT.deadlineEstimated?" · "+U.estimated:""})`;
+$("meta").innerHTML=[dlTxt,...(PROJECT.meta||[]).map(m=>`${m.k}: <b>${m.v}</b>`)].map(s=>`<span>${s}</span>`).join("");
+// Pipeline strip.
+const pipe=$("pipeline");
+if(PIPELINE.length){pipe.setAttribute("aria-label",U.pipeline);
+  pipe.innerHTML=PIPELINE.map((p,i)=>`<div${p.hot?' class="hot"':""}><span class="k">${i+1} · ${p.k}</span><span class="v">${p.v}</span><span class="d">${p.d}</span></div>`).join("")}
+else pipe.hidden=true;
+// Tree.
+const tree=$("tree"),svg=$("edges"),detail=$("detail");
+document.documentElement.style.setProperty("--lanes",STAGES.length);
+const lanes=STAGES.map(([k,l],i)=>{const d=document.createElement("div");d.className="lane";d.innerHTML=`<div class="lane-h">${i} · <span>${l}</span></div>`;tree.appendChild(d);return d});
+const el={};
+for(const [id,n] of Object.entries(N)){
+  if(!lanes[n.st]){console.warn("Node with bad stage:",id);continue}
+  const b=document.createElement("button");b.className="node";b.id="n-"+id;b.type="button";b.setAttribute("aria-pressed","false");
+  b.innerHTML=`<span class="t">${n.t}</span><span class="s">${n.s}</span><span class="tags">${tagsHtml(n.tags)}</span>`;
+  b.addEventListener("click",()=>select(id));lanes[n.st].appendChild(b);el[id]=b;
+}
+let route=null;
+function draw(){
+  const r=tree.getBoundingClientRect();svg.setAttribute("width",tree.scrollWidth);svg.setAttribute("height",tree.scrollHeight);
+  const on=route?new Set(route.nodes):null;let html="";
+  for(const [a,b] of E){
+    if(!el[a]||!el[b]){console.warn("Edge with unknown node:",a,b);continue}
+    const A=el[a].getBoundingClientRect(),B=el[b].getBoundingClientRect();
+    const x1=A.right-r.left,y1=A.top+A.height/2-r.top,x2=B.left-r.left,y2=B.top+B.height/2-r.top,mx=(x1+x2)/2;
+    const lit=on&&on.has(a)&&on.has(b);
+    html+=`<path class="edge${lit?" on":""}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+  }
+  svg.innerHTML=html;
+}
+function select(id){
+  const n=N[id];if(!n)return;
+  for(const k in el){el[k].classList.toggle("sel",k===id);el[k].setAttribute("aria-pressed",String(k===id))}
+  const F=U.fields;
+  detail.innerHTML=`<span class="eyebrow">${STAGES[n.st][1]}</span><h3>${n.t}</h3><div class="tags">${tagsHtml(n.tags)}</div>
+  <dl><div><dt>${F.what}</dt><dd>${n.what}</dd></div><div><dt>${F.need}</dt><dd>${n.need}</dd></div><div><dt>${F.risk}</dt><dd>${n.risk}</dd></div><div><dt>${F.src}</dt><dd class="src">${n.src}</dd></div></dl>`;
+}
+// Routes.
+$("routesH").textContent=U.routes;
+const chips=$("chips"),note=$("routeNote");
+function setRoute(rt){
+  route=rt;tree.classList.toggle("routed",!!rt);
+  for(const k in el)el[k].classList.toggle("on",!!rt&&rt.nodes.includes(k));
+  for(const c of chips.children)c.setAttribute("aria-pressed",String(c.dataset.id===(rt?rt.id:"none")));
+  note.innerHTML=rt?rt.note:U.wholeTreeNote;
+  try{localStorage.setItem(PROJECT.storeKey,rt?rt.id:"none")}catch(e){}
+  draw();
+}
+const all=document.createElement("button");all.className="chip";all.type="button";all.dataset.id="none";all.textContent=U.wholeTree;all.onclick=()=>setRoute(null);chips.appendChild(all);
+for(const rt of ROUTES){const c=document.createElement("button");c.className="chip";c.type="button";c.dataset.id=rt.id;c.innerHTML=`<span class="dot"></span>${rt.name}${rt.rec?" · "+U.recommended:""}`;c.onclick=()=>setRoute(rt);chips.appendChild(c)}
+// Decisions log.
+const KIND_TONE={decision:"accent",pending:"warn",assumption:"dashed",fact:"muted"};
+$("decH").textContent=fill(U.decisions,{date:DECISIONS.updated});
+$("decisions").innerHTML=DECISIONS.items.map(i=>`<li class="k-${i.kind}"><span class="lh">${tagHtml(i.kind,U.kinds[i.kind]||i.kind,KIND_TONE[i.kind])}${i.date?`<span class="date">${i.date}</span>`:""}</span><span><b>${i.title}</b> ${i.detail||""}</span></li>`).join("");
+// Calendar.
+$("calH").textContent=U.calendar;
+$("weeks").innerHTML=WEEKS.map(w=>{const badge=w.dl?tagHtml("dl",U.deadlineRow,"warn"):w.milestone?tagHtml("ms",U.milestone,"accent"):w.gate?tagHtml("gate",U.gate,"dashed"):"";
+  return `<div class="wk${w.dl?" dl":""}${w.milestone?" ms":""}${w.gate?" gate":""}"><span class="d">${w.d}</span><span class="w">${badge}${w.w}</span></div>`}).join("");
+$("calNote").innerHTML=PROJECT.calNote||"";
+$("sources").innerHTML=`<b>${U.sources}:</b> ${SOURCES}`;
+// Initial state.
+let saved=PROJECT.defaultRoute;try{saved=localStorage.getItem(PROJECT.storeKey)||PROJECT.defaultRoute}catch(e){}
+select(N[PROJECT.defaultNode]?PROJECT.defaultNode:Object.keys(N)[0]);
+setRoute(ROUTES.find(r=>r.id===saved)||null);
+window.addEventListener("resize",draw);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+if(window.ResizeObserver)new ResizeObserver(draw).observe(tree);
+</script>
+</body>
+</html>
